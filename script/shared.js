@@ -64,8 +64,6 @@ if (roomid === null) {
 }
 var authAttempted = false;
 
-function destroyFirebase() {}
-
 function tokenize(input) {
   let output = input;
   let replacements = {

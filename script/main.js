@@ -209,7 +209,7 @@ function loadCookie() {
   if (cookielock)
     return;
   cookielock = true;
-  cookieobj = getConfigObjectFromCookie();
+  cookieobj = getConfigObjectFromCookie(true);
   setConfigObject(cookieobj);
   cookielock = false;
 }
@@ -275,31 +275,34 @@ function setConfigObject(configobj) {
   document.getElementsByName('showlabel')[0].onchange();
 }
 
-function updateConfigFromFirebase(configobj) {
-  var existingConfig = getConfigObjectFromCookie();
-  if (!existingConfig || !existingConfig.ts || existingConfig.ts < configobj.ts) {
-    console.log("Overwriting config with Firebase values");
-    setConfigObject(configobj);
-    saveCookie();
-  } else {
-    console.log("Ignoring Firebase config values due to older timestamp");
-  }
-}
-
-function saveConfigToFirebase() {}
-
-function saveCookie() {
+function saveCookie(onInit = false) {
   if (cookielock)
     return;
   cookielock = true;
 
-  cookieobj = getConfigObject();
-  setCookie(cookieobj);
-
+  if(onInit) {
+    cookieobj = getConfigObjectFromCookie(onInit);
+  } else {
+    cookieobj = getConfigObject();
+    setCookie(cookieobj);
+  }
   cookielock = false;
 }
 
-function getConfigObjectFromCookie() {
+function resetCookie() {
+  if (cookielock)
+    return;
+  cookielock = true;
+  try {
+    window.localStorage.removeItem(roomid);
+    window.location.reload();
+  } catch (e) {
+    // do nothing
+  }
+  cookielock = false;
+}
+
+function getConfigObjectFromCookie(getAllKeys = true) {
   configobj = getCookie();
   var globalKeys = ["ts", "itemValues"];
 
@@ -311,12 +314,23 @@ function getConfigObjectFromCookie() {
           if (cookieDefault[gameName][key] !== undefined) {
             configobj[gameName][key] = cookieDefault[gameName][key];
           }
-        } else {
+        } else if (!getAllKeys) {
           configobj[key] = cookieDefault[key];
         }
       }
     }
   });
+  
+  if (getAllKeys) {
+    // Add any more fields you need to populate from local storage here.
+    extend(trackerData[selectedGame].items, configobj.itemValues);
+    extend(trackerData[selectedGame].chestsimportant, configobj[selectedGame].chestsimportant);
+    extend(trackerData[selectedGame].chestsopened, configobj[selectedGame].chestsopened);
+    extend(trackerData[selectedGame].chestsportal, configobj[selectedGame].chestsportal);
+    extend(trackerData[selectedGame].dungeonchests, configobj[selectedGame].dungeonchests);
+    extend(trackerData[selectedGame].dungeonbeaten, configobj[selectedGame].dungeonbeaten);
+    extend(trackerData[selectedGame].dungeonchests, configobj[selectedGame].dungeonchests);
+  }
 
   return configobj;
 }
@@ -1064,6 +1078,10 @@ function refreshMapMedallion(d) {
 
 function refreshChests() {
   for (k = 0; k < chests[selectedGame].length; k++) {
+    if(chests[selectedGame][k].isOpened != trackerData[selectedGame].chestsopened[k])
+    {
+        chests[selectedGame][k].isOpened = trackerData[selectedGame].chestsopened[k];
+    }
     let chest = chests[selectedGame][k];
     let chestDOM = document.getElementById(k);
     chestDOM.className = chestClass(k);
@@ -1325,16 +1343,6 @@ function createRoom() {
   var passcode = document.getElementById('passcodeInput').value;
 }
 
-function resetFirebase() {
-  trackerData[selectedGame].items = itemsInit[selectedGame];
-  trackerData[selectedGame].dungeonchests = dungeonchestsInit[selectedGame];
-  trackerData[selectedGame].dungeonbeaten = dungeonbeatenInit[selectedGame];
-  trackerData[selectedGame].prizes = prizesInit[selectedGame];
-  trackerData[selectedGame].medallions = medallionsInit[selectedGame];
-  trackerData[selectedGame].chestsopened = chestsopenedInit[selectedGame];
-  updateAll();
-}
-
 function useTourneyConfig() {
   // do nothing
 }
@@ -1416,13 +1424,6 @@ function updateAll() {
     vm.displayVueMap = true;
     refreshMap();
     saveCookie();
-  }
-}
-
-function confirmSaveConfigToFirebase() {
-  var confirm = window.confirm("Do you want to push your configuration to all other users of your tracker? This will overwrite their settings. (Use this to get a remote browser to match how this browser appears.)");
-  if (confirm) {
-    saveConfigToFirebase();
   }
 }
 
